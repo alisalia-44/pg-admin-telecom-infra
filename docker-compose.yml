@@ -1,0 +1,35 @@
+services:
+  postgres_dba:
+    image: postgres:16-alpine
+    container_name: pg_telecom_infra
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: MotDePasseRoot_DBA!
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "random_page_cost=1.1"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - ./scripts:/opt/scripts:ro
+      - pg_donnees:/var/lib/postgresql/data
+      - pg_sauvegardes:/var/backups/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d telecom_infra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_donnees:
+  pg_sauvegardes:

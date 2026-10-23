@@ -1,0 +1,51 @@
+name: Validation Architecture DBA PostgreSQL
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  validation_dba:
+    name: Tests d'Intégrité, Partitionnement et Audit
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: MotDePasseRoot_DBA!
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: MotDePasseRoot_DBA!
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installation du client PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Exécution des scripts SQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f sql/01_architecture_et_securite.sql
+          psql -v ON_ERROR_STOP=1 -d telecom_infra -f sql/02_partitionnement_donnees.sql
+          psql -v ON_ERROR_STOP=1 -d telecom_infra -f sql/03_audit_et_tracabilite.sql
+          psql -v ON_ERROR_STOP=1 -d telecom_infra -f sql/04_optimisation_et_supervision.sql
+          psql -v ON_ERROR_STOP=1 -d telecom_infra -f sql/05_jeu_donnees_test.sql
+      - name: Vérification du partitionnement et de l'audit
+        run: |
+          TOTAL_NORD=$(psql -d telecom_infra -t -A -c "SELECT COUNT(*) FROM ONLY production.abonnes_zone_nord;")
+          [ "${TOTAL_NORD}" -eq 125000 ]
+          NB_TRACES=$(psql -d telecom_infra -t -A -c "SELECT COUNT(*) FROM audit.journal_modifications;")
+          [ "${NB_TRACES}" -eq 2500 ]
